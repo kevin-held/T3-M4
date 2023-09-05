@@ -2,14 +2,16 @@ const Eris = require('eris');
 const axios = require('axios');
 const moment = require('moment-timezone');
 const fs = require('fs');
+require('dotenv').config();
 
-const bot = new Eris('MTEzMDk3MDM0OTc0MDIyODc1MA.GVmbHK.LXc2ktU39WgEj-LpS8qrN9_NW80SA2JnciWlIg');
+const discordApiKey = process.env.DISCORD_API_KEY;
+const bot = new Eris(discordApiKey);
 const prefix = '!';
 const defaultTimezone = 'America/New_York';
 
 // Set your OpenAI API key
-require('dotenv').config();
-const apiKey = process.env.API_KEY;
+
+const openaiApiKey = process.env.OPENAI_API_KEY;
 
 
 // Open the file for appending (creates the file if it doesn't exist)
@@ -129,7 +131,7 @@ const endpoint = 'https://api.openai.com/v1/chat/completions';
 
 const headers = {
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${apiKey}`,
+  'Authorization': `Bearer ${openaiApiKey}`,
 };
 
 
