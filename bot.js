@@ -189,51 +189,6 @@ function createRaceEmbed(raceData, qualifyingData, sprintData, timezone) {
   return raceEmbed;
 }
 
-
-function createRaceEmbedOLD(raceData, qualifyingData, sprintData, timezone) {
-  const formatTime = (time) =>
-    moment
-      .tz(time, 'YYYY-MM-DD HH:mm', 'UTC')
-      .tz(timezone)
-      .format('YYYY-MM-DD HH:mm');
-
-  const raceTime = formatTime(raceData.date + ' ' + raceData.time);
-
-  const raceEmbed = {
-    title: 'Next Formula 1 Race',
-    fields: [
-      { name: 'Race Name', value: raceData.raceName },
-      { name: 'Race Date', value: raceTime.split(' ')[0] },
-      { name: 'Race Time', value: raceTime.split(' ')[1] },
-      { name: 'Race Timezone', value: timezone },
-    ],
-    color: 0xff0000,
-    footer: { text: 'Race data provided by Ergast Developer API' },
-  };
-
-  if (qualifyingData) {
-    const qualifyingTime = formatTime(qualifyingData.date + ' ' + qualifyingData.time);
-    raceEmbed.fields.push(
-      { name: 'Qualifying Date', value: qualifyingTime.split(' ')[0] },
-      { name: 'Qualifying Time', value: qualifyingTime.split(' ')[1] }
-    );
-  } else {
-    raceEmbed.fields.push({ name: 'Qualifying', value: 'No qualifying event information available.' });
-  }
-
-  if (sprintData) {
-    const sprintTime = formatTime(sprintData.date + ' ' + sprintData.time);
-    raceEmbed.fields.push(
-      { name: 'Sprint Race Date', value: sprintTime.split(' ')[0] },
-      { name: 'Sprint Race Time', value: sprintTime.split(' ')[1] }
-    );
-  } else {
-    raceEmbed.fields.push({ name: 'Sprint Race', value: 'No sprint race information available.' });
-  }
-
-  return raceEmbed;
-}
-
 async function fetchRaceData() {
   const response = await axios.get('https://ergast.com/api/f1/current/next.json');
   return response.data.MRData.RaceTable.Races[0];
