@@ -87,4 +87,4 @@ FAQ: What date is it? - the last known subspace transmission was timestamped fro
 
 
 
-END DATA DUMP.
+END DATA TRANSFER.
