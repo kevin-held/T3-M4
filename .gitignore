@@ -41,3 +41,5 @@ jspm_packages/
 src/config/*
 
 package-lock.json
+
+*.bak
