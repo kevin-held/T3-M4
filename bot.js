@@ -1,12 +1,24 @@
-// Kevin Held - kevinwaynheld@gmail.com - 2023
+// author: Kevin Held - kevinwaynheld@gmail.com - 2023
 
 
-/* DECLARATIONS / INSTANCES */
+/* CONSTANTS / DECLARATIONS / INSTANCES */
 
 const Eris = require('eris');
 const axios = require('axios');
 const moment = require('moment-timezone');
 const fs = require('fs');
+
+const configFile = 'config.json'; // JSON file to store configuration data
+
+// Load configuration data from JSON (or set default values)
+const configData = readJSON(configFile) || {
+  prefix: '!', // Default prefix
+  timezone: 'America/New_York', // Default timezone (EST)
+  authorId: '555228695799791641', // Default author ID @awkwardsnake on Discord
+  log: 'log.txt',
+  recent: 'recent.json',
+  
+};
 
 // IMPORTANT - set up your own api key
 // run '$ npm install dotenv'.
@@ -16,21 +28,33 @@ require('dotenv').config();
 
 const discordApiKey = process.env.DISCORD_API_KEY; // get the keys from the .env file
 const openaiApiKey = process.env.OPENAI_API_KEY;  
-
 const bot = new Eris(discordApiKey);
 
-// change manually or implement todos...
-const prefix = '!'; // TODO: add a command to change the prefix
-const defaultTimezone = 'America/New_York'; // TODO: add a command to set the Timezone.
-const AUTHORID = '555228695799791641' // Discord author id, belonging to awkwardsnake, aka me. used to restart the bot. TODO: change to admin role discord const or something.
-const log = 'log.txt'
-const recentChats = 'recent.txt';
-// ....
+// Assign constants using configuration data
+const prefix = configData.prefix;
+const defaultTimezone = configData.timezone;
+const AUTHORID = configData.authorId;
+const log = configData.log;
 
-const recentStream = fs.createWriteStream(recentChats, { flags: 'a' });
+const recentStream = fs.createWriteStream(configData.recent, { flags: 'a' });
 const logStream = fs.createWriteStream(log, { flags: 'a' });
 
+const recent = readJSON(configData.recent);
+// the command list
 const commands = {
+	prefix: {
+		description: `Change the prefix for commands. Currently set to ${prefix}`,
+		usage: 'prefix',
+		execute: async (message, args) => {
+			try {
+				configData.prefix = args[0];
+				logStream.write(`Prefix changed to ${prefix}`);
+				await bot.createMessage(message.channel.id, `Prefix changed to ${prefix}`);
+			} catch (error) {
+				handleError(message.channel.id, 'Error in prefix command');
+			}
+		},
+	}, 
 	nextrace: {
 		description: 'Get information about the next Formula 1 race.',
 		usage: 'nextrace',
@@ -43,7 +67,7 @@ const commands = {
 				const raceEmbed = createRaceEmbed(raceData, qualifyingData, sprintData, timezone);
 				await bot.createMessage(message.channel.id, { embed: raceEmbed });
 			} catch (error) {
-				handleError(message.channel.id);
+				handleError(message.channel.id, 'Error in nextrace command');
 			}
 		},
 	}, 
@@ -72,8 +96,43 @@ const commands = {
 			}
 		},
 	},
+	clear: {
+		description: 'Clear recent memory',
+		usage: 'clear',
+		execute: (message) => {
+			fs.writeFileSync('recent.json', JSON.stringify({}, null, 2), 'utf-8');
+		}
+	}
 	// ***additional commands can be added here*** 
 };
+
+/* JSON FUNCTIONS */
+
+// Function to read JSON data from a file
+function readJSON(filename) {
+	try {
+		const jsonData = fs.readFileSync(filename, 'utf-8');
+		return JSON.parse(jsonData);
+	} catch (error) {
+		console.error(`Error reading JSON file '${filename}':`, error);
+		logStream.write(`Error reading JSON file '${filename}':`, error);
+		return null;
+	}
+}
+
+// Function to write JSON data to a file
+function writeJSON(filename, data) {
+	try {
+		const jsonData = JSON.stringify(data, null, 2);
+		fs.writeFileSync(filename, jsonData, 'utf-8');
+		console.log(`Data has been written to ${filename}`);
+		logStream.write(`Data has been written to ${filename}`);
+	} catch (error) {
+		console.error(`Error writing to JSON file '${filename}':`, error);
+		logStream.write(`Error writing to JSON file '${filename}':`, error);
+	}
+}
+
 
 
 /* FUNCTIONS */
@@ -82,7 +141,7 @@ const commands = {
 async function reply(message) {
 	try {
 		// Generate a response from ChatGPT
-		const chatGptResponse = await generateChatGptResponse(message)
+		await generateChatGptResponse(message);
 		
 	} catch (error) {
 		handleError(message.channel.id, "Error in reply");
@@ -128,6 +187,7 @@ async function generateChatGptResponse(message) {
 		await axios.post(endpoint, data, { headers }).then((response) => {
 			bot.createMessage(message.channel.id, response.data.choices[0].message.content);
 			logStream.write(response.data.choices[0].message.content + "\n");
+			addMessageToRecent(message.channel.name + "#" + message.channel.id, "T3-M4", response.data.choices[0].message.content);
 			//console.log('Response:', response.data);
 			return response.data.choices[0].message.content;
 		});
@@ -189,6 +249,32 @@ function handleError(channelId = 0, logMessage = "An error has occurred. ") {
 	logStream.write(logMessage + "\n");
 }
 
+// Function to add a message to the recent.json file
+function addMessageToRecent(channel, author, message) {
+  try {
+    // Read the existing JSON data from the recent.json file
+    const recentData = JSON.parse(fs.readFileSync('recent.json', 'utf-8'));
+
+	// Check if the channel exists, create it if not
+    if (!recentData[channel]) {
+      recentData[channel] = [];
+    }
+
+	//console.log(recentData[channel].length);
+    recentData[channel].push({ 
+		"author" : author,
+		"timestamp" : new Date().toLocaleString(),
+		"content" : message,
+	})
+
+    // Write the updated data back to the recent.json file
+    fs.writeFileSync('recent.json', JSON.stringify(recentData, null, 2), 'utf-8');
+
+    console.log('Message added to recent.json');
+  } catch (error) {
+    console.error('Error adding message to recent.json:', error);
+  }
+}
 
 
 /* LISTENERS */
@@ -199,15 +285,20 @@ bot.on('messageCreate', async (message) => {
 
 		// update recent.txt
 		// Format the message data (e.g., timestamp, author, content)
-		const recentMessage = `[${new Date().toLocaleString()}] ${message.author.username}: ${message.content}\n`;
+		const recentMessage = `[${new Date().toLocaleString()}] ${message.channel.name}#${message.channel.id}:${message.author.username}: ${message.content}\n`; // for txt logs
 
 		// write the message to the recent.txt file
-		recentStream.write(recentMessage);
+		//recentStream.write(recentMessage);
+		const channelString = message.channel.name + "#" + message.channel.id;
+		const authorString = message.author.username + "#" + message.author.id;
+		addMessageToRecent(channelString, authorString, message.content);
 
 		// if the message mentions the bot
 		if (message.mentions.find((mention) => mention.id === bot.user.id)) {
 			// Reply with a simple message when mentioned
 			reply(message);
+			
+			
 			return;
 		}
 
